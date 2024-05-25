@@ -355,7 +355,7 @@ impl<'a> Device<'a> {
         let activity = format!(
             "{}.{}/{}",
             config.app().reverse_domain(),
-            config.app().lib_name(),
+            config.app().name_snake(),
             activity
         );
         self.adb(env)
