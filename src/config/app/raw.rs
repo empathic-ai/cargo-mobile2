@@ -87,7 +87,7 @@ impl Defaults {
             .to_str()
             .ok_or_else(|| DefaultsError::CurrentDirInvalidUtf8(cwd.clone()))?;
         Ok(Self {
-            name: name::transliterate(&dir_name.to_kebab_case()),
+            name: Some("testytest.testy.test".to_string()),//name::transliterate(&dir_name.to_kebab_case()),
             stylized_name: dir_name.to_title_case(),
             domain: default_domain(wrapper)
                 .ok()
