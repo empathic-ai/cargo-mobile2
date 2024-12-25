@@ -9,7 +9,6 @@ use std::fmt::{self, Debug, Display};
 #[derive(Debug)]
 pub enum DetectError {
     DeveloperTeamLookupFailed(teams::Error),
-    DeveloperTeamsEmpty,
 }
 
 impl Display for DetectError {
@@ -18,7 +17,6 @@ impl Display for DetectError {
             Self::DeveloperTeamLookupFailed(err) => {
                 write!(f, "Failed to find Apple developer teams: {}", err)
             }
-            Self::DeveloperTeamsEmpty => write!(f, "No Apple developer teams were detected."),
         }
     }
 }
@@ -116,7 +114,7 @@ pub struct PListPair {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Raw {
-    pub development_team: String,
+    pub development_team: Option<String>,
     pub project_dir: Option<String>,
     pub ios_no_default_features: Option<bool>,
     pub ios_features: Option<Vec<String>>,
@@ -129,6 +127,7 @@ pub struct Raw {
     pub use_legacy_build_system: Option<bool>,
     pub plist_pairs: Option<Vec<PListPair>>,
     pub enable_bitcode: Option<bool>,
+    pub export_options_plist_path: Option<String>,
 }
 
 impl Raw {
@@ -137,9 +136,8 @@ impl Raw {
             teams::find_development_teams().map_err(DetectError::DeveloperTeamLookupFailed)?;
         Ok(Self {
             development_team: development_teams
-                .get(0)
-                .map(|development_team| development_team.id.clone())
-                .ok_or_else(|| DetectError::DeveloperTeamsEmpty)?,
+                .first()
+                .map(|development_team| development_team.id.clone()),
             project_dir: None,
             ios_no_default_features: None,
             ios_features: None,
@@ -152,6 +150,7 @@ impl Raw {
             use_legacy_build_system: None,
             plist_pairs: None,
             enable_bitcode: None,
+            export_options_plist_path: None,
         })
     }
 
@@ -221,7 +220,7 @@ impl Raw {
             }
         };
         Ok(Self {
-            development_team,
+            development_team: Some(development_team),
             project_dir: None,
             ios_no_default_features: None,
             ios_features: None,
@@ -234,6 +233,7 @@ impl Raw {
             use_legacy_build_system: None,
             plist_pairs: None,
             enable_bitcode: None,
+            export_options_plist_path: None,
         })
     }
 }

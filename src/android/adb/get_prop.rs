@@ -1,10 +1,11 @@
-use super::adb;
 use crate::{
     android::env::Env,
     util::cli::{Report, Reportable},
 };
 use std::str;
 use thiserror::Error;
+
+use super::adb;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -38,13 +39,16 @@ impl Reportable for Error {
 
 pub fn get_prop(env: &Env, serial_no: &str, prop: &str) -> Result<String, Error> {
     let prop_ = prop.to_string();
-    let handle = adb(env, serial_no)
+    let handle = adb(env, ["-s", serial_no])
         .before_spawn(move |cmd| {
             cmd.args(["shell", "getprop", &prop_]);
             Ok(())
         })
+        .stdin_file(os_pipe::dup_stdin().unwrap())
         .stdout_capture()
+        .stderr_capture()
         .start()?;
+
     let output = handle.wait()?;
     super::check_authorized(output).map_err(|source| Error::LookupFailed {
         prop: prop.to_owned(),

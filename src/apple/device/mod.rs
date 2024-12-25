@@ -4,6 +4,7 @@ use super::{
     target::{ArchiveError, BuildError, ExportError, Target},
 };
 use crate::{
+    apple::target::{ArchiveConfig, BuildConfig, ExportConfig},
     env::{Env, ExplicitEnv as _},
     opts,
     util::cli::{Report, Reportable},
@@ -54,7 +55,7 @@ impl Reportable for RunError {
     }
 }
 
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 pub enum DeviceKind {
     Simulator,
     IosDeployDevice,
@@ -112,6 +113,10 @@ impl<'a> Device<'a> {
         &self.model
     }
 
+    pub fn kind(&self) -> DeviceKind {
+        self.kind
+    }
+
     pub fn run(
         &self,
         config: &Config,
@@ -123,20 +128,40 @@ impl<'a> Device<'a> {
         // TODO: These steps are run unconditionally, which is slooooooow
         println!("Building app...");
         self.target
-            .build(config, env, noise_level, profile)
+            .build(
+                config,
+                env,
+                noise_level,
+                profile,
+                BuildConfig::new().allow_provisioning_updates(),
+            )
             .map_err(RunError::BuildFailed)?;
         println!("Archiving app...");
         self.target
-            .archive(config, env, noise_level, profile, None)
+            .archive(
+                config,
+                env,
+                noise_level,
+                profile,
+                None,
+                ArchiveConfig::new(),
+            )
             .map_err(RunError::ArchiveFailed)?;
 
         match self.kind {
-            DeviceKind::Simulator => simctl::run(config, env, non_interactive, &self.id)
-                .map_err(|e| RunError::DeployFailed(e.to_string())),
+            DeviceKind::Simulator => {
+                simctl::run(config, env, non_interactive, noise_level, &self.id)
+                    .map_err(|e| RunError::DeployFailed(e.to_string()))
+            }
             DeviceKind::IosDeployDevice | DeviceKind::DeviceCtlDevice => {
                 println!("Exporting app...");
                 self.target
-                    .export(config, env, noise_level)
+                    .export(
+                        config,
+                        env,
+                        noise_level,
+                        ExportConfig::default().allow_provisioning_updates(),
+                    )
                     .map_err(RunError::ExportFailed)?;
                 println!("Extracting IPA...");
 
@@ -152,16 +177,24 @@ impl<'a> Device<'a> {
                         }
                         cmd.arg("-o").arg(&ipa_path).arg("-d").arg(&export_dir);
                         Ok(())
-                    });
+                    })
+                    .dup_stdio();
 
                 cmd.run().map_err(RunError::UnzipFailed)?;
 
                 if self.kind == DeviceKind::IosDeployDevice {
-                    ios_deploy::run_and_debug(config, env, non_interactive, &self.id)
+                    ios_deploy::run_and_debug(config, env, non_interactive, &self.id, noise_level)
                         .map_err(|e| RunError::DeployFailed(e.to_string()))
                 } else {
-                    devicectl::run(config, env, non_interactive, &self.id, self.paired)
-                        .map_err(|e| RunError::DeployFailed(e.to_string()))
+                    devicectl::run(
+                        config,
+                        env,
+                        non_interactive,
+                        &self.id,
+                        self.paired,
+                        noise_level,
+                    )
+                    .map_err(|e| RunError::DeployFailed(e.to_string()))
                 }
             }
         }

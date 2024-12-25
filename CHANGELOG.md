@@ -1,5 +1,126 @@
 # Changelog
 
+## \[0.17.4]
+
+- [`c4d420f`](https://github.com/tauri-apps/cargo-mobile2/commit/c4d420f9b9a35b52e24ad06de6c810f424ec45a3) ([#414](https://github.com/tauri-apps/cargo-mobile2/pull/414) by [@amrbashir](https://github.com/tauri-apps/cargo-mobile2/../../amrbashir)) Fix `android::emulator::avd_list` function interpreting log lines from `emulator -list-avd` as valid `Emulator`
+- [`b4d615f`](https://github.com/tauri-apps/cargo-mobile2/commit/b4d615f7798afcb7c15aca02883bb931c5fa3431) ([#404](https://github.com/tauri-apps/cargo-mobile2/pull/404) by [@jmetz](https://github.com/tauri-apps/cargo-mobile2/../../jmetz)) Remove deprecated options from gradle file in the generated android template.
+
+## \[0.17.3]
+
+- [`1ec0ca5`](https://github.com/tauri-apps/cargo-mobile2/commit/1ec0ca542db074d8bd8351b094759011f6b712a2) ([#395](https://github.com/tauri-apps/cargo-mobile2/pull/395) by [@amrbashir](https://github.com/tauri-apps/cargo-mobile2/../../amrbashir)) Fix deserializing targets from `.cargo/config.toml` if the target's `rustflags` field is not specified
+- [`e66010f`](https://github.com/tauri-apps/cargo-mobile2/commit/e66010f867f6ad4f4830fdb20a846a0ef474c1b7) ([#398](https://github.com/tauri-apps/cargo-mobile2/pull/398) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Removed name and lib name validation as they are not used as the package identifier anymore.
+
+## \[0.17.2]
+
+- [`cdb6ed3`](https://github.com/tauri-apps/cargo-mobile2/commit/cdb6ed362e33ffd21ebb3b6a2f1441040b7e45d1) ([#388](https://github.com/tauri-apps/cargo-mobile2/pull/388) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Only display logs from the actual iOS application unless pedantic verbosity is requested.
+- [`cdb6ed3`](https://github.com/tauri-apps/cargo-mobile2/commit/cdb6ed362e33ffd21ebb3b6a2f1441040b7e45d1) ([#388](https://github.com/tauri-apps/cargo-mobile2/pull/388) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Always use verbose logging when building the app on iOS (`Target::build`) to display cargo build output.
+
+## \[0.17.1]
+
+- [`ce80447`](https://github.com/tauri-apps/cargo-mobile2/commit/ce804479427435cba770ffa941e27ce32b271533) ([#380](https://github.com/tauri-apps/cargo-mobile2/pull/380) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) The Rust flags for Android builds no longer need to search the .cargo folder for libraries.
+
+## \[0.17.0]
+
+- [`64d3e6f`](https://github.com/tauri-apps/cargo-mobile2/commit/64d3e6f04f2a6613b23caf0038812beab9554acb) ([#383](https://github.com/tauri-apps/cargo-mobile2/pull/383) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Added an `ArchiveConfig` parameter to `apple::Target::archive`.
+- [`64d3e6f`](https://github.com/tauri-apps/cargo-mobile2/commit/64d3e6f04f2a6613b23caf0038812beab9554acb) ([#383](https://github.com/tauri-apps/cargo-mobile2/pull/383) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Allow skipping code signing on `Apple::Target` `build` and `archive` methods,
+  which fixes an issue in CI where automatic signing only works on the first execution,
+  and following runs errors with `Revoke certificate: Your account already has a signing certificate for this machine but it is not present in your keychain`.
+
+## \[0.16.0]
+
+- [`e289dd9`](https://github.com/tauri-apps/cargo-mobile2/commit/e289dd95a435ad069e8252519a2e1232f9376d98) ([#381](https://github.com/tauri-apps/cargo-mobile2/pull/381) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Added a `BuildConfig` argument to the `Target::build` iOS method to allow provisioning updates.
+- [`e289dd9`](https://github.com/tauri-apps/cargo-mobile2/commit/e289dd95a435ad069e8252519a2e1232f9376d98) ([#381](https://github.com/tauri-apps/cargo-mobile2/pull/381) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Move `AuthCredentials` to `cargo_mobile2::apple`.
+
+## \[0.15.1]
+
+- [`c92d72f`](https://github.com/tauri-apps/cargo-mobile2/commit/c92d72f4a09166d54a4653d8ce9ac44296fc00c4) ([#377](https://github.com/tauri-apps/cargo-mobile2/pull/377) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Added `apple::Config::development_team` getter.
+
+## \[0.15.0]
+
+- [`da40535`](https://github.com/tauri-apps/cargo-mobile2/commit/da40535856cc6ca3b372e3e95b3bd59a2a391a47) ([#375](https://github.com/tauri-apps/cargo-mobile2/pull/375) by [@amrbashir](https://github.com/tauri-apps/cargo-mobile2/../../amrbashir)) The app identifier must now be provided in reverse order (e.g. `dev.tauri.app` instead of `app.tauri.dev`). Removed `App::reverse_identifier` and Added `App::identifier`.
+
+## \[0.14.0]
+
+- [`d0e9e58`](https://github.com/tauri-apps/cargo-mobile2/commit/d0e9e587a085d3b08a2e082dea562dbc252ad191) ([#371](https://github.com/tauri-apps/cargo-mobile2/pull/371) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Added a `ExportConfig` argument to the `Target::export` iOS method to allow provisioning updates.
+
+## \[0.13.5]
+
+- [`f09a6da`](https://github.com/tauri-apps/cargo-mobile2/commit/f09a6dad8c27116f1cba123038a603bdb2cd8abc) Allow hyphens on iOS identifiers and underscores on Android identifiers.
+
+## \[0.13.4]
+
+- [`f5548f7`](https://github.com/tauri-apps/cargo-mobile2/commit/f5548f7a522325820662d041b518eb361766358b) ([#362](https://github.com/tauri-apps/cargo-mobile2/pull/362) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Added `Config::set_export_options_plist_path` to define a custom ExportOptions.plist to use.
+- [`b1e407c`](https://github.com/tauri-apps/cargo-mobile2/commit/b1e407cf21f90dfc664436703e73ec1f819d6438) ([#359](https://github.com/tauri-apps/cargo-mobile2/pull/359) by [@amrbashir](https://github.com/tauri-apps/cargo-mobile2/../../amrbashir)) Update `windows` crate to `0.58`
+
+## \[0.13.3]
+
+- [`b1c2313`](https://github.com/tauri-apps/cargo-mobile2/commit/b1c2313a2ab31e7e8e166b8068dce94b8b28000f) ([#353](https://github.com/tauri-apps/cargo-mobile2/pull/353) by [@mrguiman](https://github.com/tauri-apps/cargo-mobile2/../../mrguiman)) Do not include the target arch when building and archiving the iOS application.
+
+## \[0.13.2]
+
+- [`48c7f8e`](https://github.com/tauri-apps/cargo-mobile2/commit/48c7f8ec7b60feae5b04c45cb630a945696126f6) Added `android::Device::serial_no` getter.
+
+## \[0.13.1]
+
+- [`71d648f`](https://github.com/tauri-apps/cargo-mobile2/commit/71d648f16478e0fe867375ec933c4deb97406124) Update handlebars to v6.
+
+## \[0.13.0]
+
+- [`aad5655`](https://github.com/tauri-apps/cargo-mobile2/commit/aad5655bfeb9c14c72e30e218792a0b586709594) ([#354](https://github.com/tauri-apps/cargo-mobile2/pull/354) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Expose `apple::Device::kind`.
+- [`aad5655`](https://github.com/tauri-apps/cargo-mobile2/commit/aad5655bfeb9c14c72e30e218792a0b586709594) ([#354](https://github.com/tauri-apps/cargo-mobile2/pull/354) by [@lucasfernog](https://github.com/tauri-apps/cargo-mobile2/../../lucasfernog)) Changed the `android::adb::adb` function to be generic.
+
+## \[0.12.2]
+
+- [`52c2905`](https://github.com/tauri-apps/cargo-mobile2/commit/52c290526debb0a26b0128cc587c542db50bc847) ([#343](https://github.com/tauri-apps/cargo-mobile2/pull/343)) Update `windows` crate to `0.57`
+
+## \[0.12.1]
+
+- [`7d260ba`](https://github.com/tauri-apps/cargo-mobile2/commit/7d260ba290beb39c57863eaa8a8a523ede20093b)([#328](https://github.com/tauri-apps/cargo-mobile2/pull/328)) On Android, allows using Kotlin keywords as identifiers and escape them in templates.
+
+## \[0.12.0]
+
+- [`adb2846`](https://github.com/tauri-apps/cargo-mobile2/commit/adb2846ab60642b3cc0a950e60c8c0f9c05f6cb5)([#297](https://github.com/tauri-apps/cargo-mobile2/pull/297)) Fix creating a new `bevy` project.
+- [`29921ff`](https://github.com/tauri-apps/cargo-mobile2/commit/29921ff025ebed31546e33dc82696dc0c8fce2e0)([#330](https://github.com/tauri-apps/cargo-mobile2/pull/330)) Use `config.identifier` as the package name in Android and bundle ID in iOS.
+
+  **BREAKING CHANGE:**
+
+  - In `Config`, renamed field `domain` to `identifier`.
+  - In `App`, renamed method `reverse_domain` to `reverse_identifier`.
+- [`525d51f`](https://github.com/tauri-apps/cargo-mobile2/commit/525d51fc61e9461bd5468124554fc12d7382333f)([#305](https://github.com/tauri-apps/cargo-mobile2/pull/305)) Update `windows` crate to `0.56`
+- [`2beb485`](https://github.com/tauri-apps/cargo-mobile2/commit/2beb485387e67fc14cc2b714cb457726e4cd1d77)([#298](https://github.com/tauri-apps/cargo-mobile2/pull/298)) Fix `wry` template crashing on Linux.
+
+## \[0.11.1]
+
+- [`cb4ed53`](https://github.com/tauri-apps/cargo-mobile2/commit/cb4ed53069f404a0eed9988b7a0dd0e29509572e)([#300](https://github.com/tauri-apps/cargo-mobile2/pull/300)) Fix `.gitignore` generated with wrong formatting.
+- [`ad41fe2`](https://github.com/tauri-apps/cargo-mobile2/commit/ad41fe2328da9cb3c485f37d8081f99688463b48)([#296](https://github.com/tauri-apps/cargo-mobile2/pull/296)) Generate `.cargo/config.toml` with paths wrapped in quote.
+
+## \[0.11.0]
+
+- [`b370b38`](https://github.com/tauri-apps/cargo-mobile2/commit/b370b38acc8975d3f84c012354732a28edbb9e34)([#285](https://github.com/tauri-apps/cargo-mobile2/pull/285)) Fix a bug in checking for package presence when initiating an ios project
+- [`0c91351`](https://github.com/tauri-apps/cargo-mobile2/commit/0c91351ef6452a8f9bad58469bca42704d8a9a1e)([#292](https://github.com/tauri-apps/cargo-mobile2/pull/292)) Remove `openssl` and use `x509-certificate` instead.
+- [`1567a7a`](https://github.com/tauri-apps/cargo-mobile2/commit/1567a7a16772a2fe904e95409b74c02846de4b33)([#288](https://github.com/tauri-apps/cargo-mobile2/pull/288)) Update `windows` crate to `0.54`
+
+## \[0.10.4]
+
+- [`7a1066c`](https://github.com/tauri-apps/cargo-mobile2/commit/7a1066cd93d0e4cf158ccfa6a41652f2934758da)([#283](https://github.com/tauri-apps/cargo-mobile2/pull/283)) Use `adb install -r` to try replacing the android application while installing it on the device. This elimnates the need to uninstall the application from a previous run when using a real device.
+- [`5a84ab2`](https://github.com/tauri-apps/cargo-mobile2/commit/5a84ab256c376e0424e2ddd6ffc44c5f0d9b5fbe)([#281](https://github.com/tauri-apps/cargo-mobile2/pull/281)) Update `wry` template to `wry@0.37`
+
+## \[0.10.3]
+
+- [`92eda19`](https://github.com/tauri-apps/cargo-mobile2/commit/92eda19af2a10b80470a96ade3d3dbd2a4d2af6f)([#279](https://github.com/tauri-apps/cargo-mobile2/pull/279)) Fixes log output on iOS simulators.
+
+## \[0.10.2]
+
+- [\`\`](https://github.com/tauri-apps/cargo-mobile2/commit/undefined) Fix adb usage for NAPI context following v0.10.1 fix.
+
+## \[0.10.1]
+
+- [`b12ef08`](https://github.com/tauri-apps/cargo-mobile2/commit/b12ef081c0dba630e92f924a34d4c768ef1fa522)([#277](https://github.com/tauri-apps/cargo-mobile2/pull/277)) Fix child process spawning on NAPI contexts.
+
+## \[0.10.0]
+
+- [`d90ccf4`](https://github.com/tauri-apps/cargo-mobile2/commit/d90ccf4c50dc180e082693b310d1f34f67d977e7)([#273](https://github.com/tauri-apps/cargo-mobile2/pull/273)) The development team configuration is now optional so you can develop on a simulator without a signing certificate.
+
 ## \[0.9.1]
 
 - [`01d52ca`](https://github.com/tauri-apps/cargo-mobile2/commit/01d52ca2c1a582cb5a06193629d2b0bec3282ac6)([#265](https://github.com/tauri-apps/cargo-mobile2/pull/265)) Use devicectl even if iOS device is disconnected.

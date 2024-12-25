@@ -13,7 +13,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 use thiserror::Error;
@@ -230,6 +230,8 @@ pub enum Error {
     IosVersionNumberMismatch,
     #[error("`apple.app-version` `bundle-version-short` cannot be specified without also specifying `bundle-version`")]
     InvalidVersionConfiguration,
+    #[error("Identifier cannot contain underscores on iOS")]
+    IdentifierCannotContainUnderscores,
 }
 
 impl Error {
@@ -281,7 +283,7 @@ impl VersionInfo {
 pub struct Config {
     #[serde(skip_serializing)]
     app: App,
-    development_team: String,
+    development_team: Option<String>,
     project_dir: String,
     bundle_version: VersionNumber,
     bundle_version_short: VersionTriple,
@@ -290,13 +292,23 @@ pub struct Config {
     use_legacy_build_system: bool,
     plist_pairs: Vec<PListPair>,
     enable_bitcode: bool,
+    export_options_plist_path: PathBuf,
 }
 
 impl Config {
     pub fn from_raw(app: App, raw: Option<Raw>) -> Result<Self, Error> {
+        if app.identifier().contains('_') {
+            return Err(Error::IdentifierCannotContainUnderscores);
+        }
+
         let raw = raw.ok_or_else(|| Error::DevelopmentTeamMissing)?;
 
-        if raw.development_team.is_empty() {
+        if raw
+            .development_team
+            .as_ref()
+            .map(|t| t.is_empty())
+            .unwrap_or_default()
+        {
             return Err(Error::DevelopmentTeamEmpty);
         }
 
@@ -336,6 +348,11 @@ impl Config {
                 (bundle_version, bundle_version_short)
             })?;
 
+        let export_options_plist_path = raw
+            .export_options_plist_path
+            .map(PathBuf::from)
+            .unwrap_or_else(|| "ExportOptions.plist".into());
+
         Ok(Self {
             app,
             development_team: raw.development_team,
@@ -357,7 +374,12 @@ impl Config {
             use_legacy_build_system: raw.use_legacy_build_system.unwrap_or(true),
             plist_pairs: raw.plist_pairs.unwrap_or_default(),
             enable_bitcode: raw.enable_bitcode.unwrap_or(false),
+            export_options_plist_path,
         })
+    }
+
+    pub fn set_export_options_plist_path<P: AsRef<Path>>(&mut self, path: P) {
+        self.export_options_plist_path = path.as_ref().to_path_buf();
     }
 
     pub fn app(&self) -> &App {
@@ -395,7 +417,7 @@ impl Config {
     }
 
     pub fn export_plist_path(&self) -> PathBuf {
-        self.project_dir().join("ExportOptions.plist")
+        self.project_dir().join(&self.export_options_plist_path)
     }
 
     pub fn ipa_path(&self) -> Result<PathBuf, (PathBuf, PathBuf)> {
@@ -421,5 +443,9 @@ impl Config {
 
     pub fn bundle_version(&self) -> &VersionNumber {
         &self.bundle_version
+    }
+
+    pub fn development_team(&self) -> Option<&str> {
+        self.development_team.as_deref()
     }
 }

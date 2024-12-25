@@ -1,4 +1,4 @@
-use super::{common_email_providers::COMMON_EMAIL_PROVIDERS, domain, name};
+use super::{common_email_providers::COMMON_EMAIL_PROVIDERS, identifier, name};
 use crate::{
     templating,
     util::{cli::TextWrapper, prompt, Git},
@@ -14,22 +14,26 @@ use std::{
 };
 
 #[derive(Debug)]
-enum DefaultDomainError {
-    FailedToGetGitEmailAddr(std::io::Error),
+enum DefaultIdentifierError {
+    FailedToGetGitEmailAddr(#[allow(unused)] std::io::Error),
     FailedToParseEmailAddr,
 }
 
-fn default_domain(_wrapper: &TextWrapper) -> Result<Option<String>, DefaultDomainError> {
+fn default_identifier(
+    _wrapper: &TextWrapper,
+    name: &str,
+) -> Result<Option<String>, DefaultIdentifierError> {
     let email = Git::new(".".as_ref())
         .user_email()
-        .map_err(DefaultDomainError::FailedToGetGitEmailAddr)?;
+        .map_err(DefaultIdentifierError::FailedToGetGitEmailAddr)?;
     let domain = email
         .trim()
         .split('@')
         .last()
-        .ok_or(DefaultDomainError::FailedToParseEmailAddr)?;
+        .ok_or(DefaultIdentifierError::FailedToParseEmailAddr)?;
     Ok(
-        if !COMMON_EMAIL_PROVIDERS.contains(&domain) && domain::check_domain_syntax(domain).is_ok()
+        if !COMMON_EMAIL_PROVIDERS.contains(&domain)
+            && identifier::check_identifier_syntax(domain).is_ok()
         {
             #[cfg(not(feature = "brainium"))]
             if domain == "brainiumstudios.com" {
@@ -38,7 +42,9 @@ fn default_domain(_wrapper: &TextWrapper) -> Result<Option<String>, DefaultDomai
                     "If that's not intentional, run `cargo install --force --git https://github.com/tauri-apps/cargo-mobile2 --features brainium`",
                 ).print(_wrapper);
             }
-            Some(domain.to_owned())
+
+            let reverse_domain = domain.split('.').rev().collect::<Vec<_>>().join(".");
+            Some(format!("{reverse_domain}{name}"))
         } else {
             None
         },
@@ -74,7 +80,7 @@ impl Display for DefaultsError {
 struct Defaults {
     name: Option<String>,
     stylized_name: String,
-    domain: String,
+    identifier: String,
 }
 
 impl Defaults {
@@ -86,13 +92,19 @@ impl Defaults {
         let dir_name = dir_name
             .to_str()
             .ok_or_else(|| DefaultsError::CurrentDirInvalidUtf8(cwd.clone()))?;
+        let name = name::transliterate(&dir_name.to_kebab_case());
+        let dot_name = name
+            .as_ref()
+            .map(|n| format!(".{n}"))
+            .unwrap_or_default()
+            .replace("-", "_");
         Ok(Self {
-            name: name::transliterate(&dir_name.to_kebab_case()),
-            stylized_name: dir_name.to_title_case(),
-            domain: default_domain(wrapper)
+            identifier: default_identifier(wrapper, &dot_name)
                 .ok()
                 .flatten()
-                .unwrap_or_else(|| "example.com".to_owned()),
+                .unwrap_or_else(|| format!("com.example{dot_name}")),
+            name,
+            stylized_name: dir_name.to_title_case(),
         })
     }
 }
@@ -117,7 +129,7 @@ pub enum PromptError {
     DefaultsFailed(DefaultsError),
     NamePromptFailed(io::Error),
     StylizedNamePromptFailed(io::Error),
-    DomainPromptFailed(io::Error),
+    IdentifierPromptFailed(io::Error),
     ListTemplatePacksFailed(templating::ListError),
     TemplatePackPromptFailed(io::Error),
 }
@@ -130,7 +142,9 @@ impl Display for PromptError {
             Self::StylizedNamePromptFailed(err) => {
                 write!(f, "Failed to prompt for stylized name: {}", err)
             }
-            Self::DomainPromptFailed(err) => write!(f, "Failed to prompt for domain: {}", err),
+            Self::IdentifierPromptFailed(err) => {
+                write!(f, "Failed to prompt for identifier: {}", err)
+            }
             Self::ListTemplatePacksFailed(err) => write!(f, "{}", err),
             Self::TemplatePackPromptFailed(err) => {
                 write!(f, "Failed to prompt for template pack: {}", err)
@@ -145,7 +159,7 @@ pub struct Raw {
     pub name: String,
     pub lib_name: Option<String>,
     pub stylized_name: Option<String>,
-    pub domain: String,
+    pub identifier: String,
     pub asset_dir: Option<String>,
     pub template_pack: Option<String>,
 }
@@ -157,7 +171,7 @@ impl Raw {
             name: defaults.name.ok_or_else(|| DetectError::NameNotDetected)?,
             lib_name: None,
             stylized_name: Some(defaults.stylized_name),
-            domain: defaults.domain,
+            identifier: defaults.identifier,
             asset_dir: None,
             template_pack: Some(super::DEFAULT_TEMPLATE_PACK.to_owned())
                 .filter(|pack| pack != super::IMPLIED_TEMPLATE_PACK),
@@ -166,16 +180,16 @@ impl Raw {
 
     pub fn prompt(wrapper: &TextWrapper) -> Result<Self, PromptError> {
         let defaults = Defaults::new(wrapper).map_err(PromptError::DefaultsFailed)?;
-        let (name, default_stylized) = Self::prompt_name(wrapper, &defaults)?;
+        let (name, default_stylized) = Self::prompt_name(&defaults)?;
         let stylized_name = Self::prompt_stylized_name(&name, default_stylized)?;
-        let domain = Self::prompt_domain(wrapper, &defaults)?;
+        let identifier = Self::prompt_identifier(wrapper, &defaults)?;
         let template_pack = Some(Self::prompt_template_pack(wrapper)?)
             .filter(|pack| pack != super::IMPLIED_TEMPLATE_PACK);
         Ok(Self {
             name,
             lib_name: None,
             stylized_name: Some(stylized_name),
-            domain,
+            identifier,
             asset_dir: None,
             template_pack,
         })
@@ -183,41 +197,11 @@ impl Raw {
 }
 
 impl Raw {
-    fn prompt_name(
-        wrapper: &TextWrapper,
-        defaults: &Defaults,
-    ) -> Result<(String, Option<String>), PromptError> {
-        let mut default_name = defaults.name.clone();
-        let mut rejected = None;
-        let mut default_stylized = None;
-        let name = loop {
-            let response = prompt::default("Project name", default_name.as_deref(), None)
-                .map_err(PromptError::NamePromptFailed)?;
-            match name::validate(response.clone()) {
-                Ok(response) => {
-                    if default_name == Some(response.clone()) {
-                        if rejected.is_some() {
-                            default_stylized = rejected.take();
-                        } else {
-                            default_stylized = Some(defaults.stylized_name.clone());
-                        }
-                    }
-                    break response;
-                }
-                Err(err) => {
-                    rejected = Some(response);
-                    println!(
-                        "{}",
-                        wrapper
-                            .fill(&format!("Gosh, that's not a valid project name! {}", err))
-                            .bright_magenta()
-                    );
-                    if let Some(suggested) = err.suggested() {
-                        default_name = Some(suggested.to_owned());
-                    }
-                }
-            }
-        };
+    fn prompt_name(defaults: &Defaults) -> Result<(String, Option<String>), PromptError> {
+        let default_name = defaults.name.clone();
+        let name = prompt::default("Project name", default_name.as_deref(), None)
+            .map_err(PromptError::NamePromptFailed)?;
+        let default_stylized = Some(defaults.stylized_name.clone());
         Ok((name, default_stylized))
     }
 
@@ -231,11 +215,14 @@ impl Raw {
             .map_err(PromptError::StylizedNamePromptFailed)
     }
 
-    fn prompt_domain(wrapper: &TextWrapper, defaults: &Defaults) -> Result<String, PromptError> {
+    fn prompt_identifier(
+        wrapper: &TextWrapper,
+        defaults: &Defaults,
+    ) -> Result<String, PromptError> {
         Ok(loop {
-            let response = prompt::default("Domain", Some(&defaults.domain), None)
-                .map_err(PromptError::DomainPromptFailed)?;
-            match domain::check_domain_syntax(response.as_str()) {
+            let response = prompt::default("Identifier", Some(&defaults.identifier), None)
+                .map_err(PromptError::IdentifierPromptFailed)?;
+            match identifier::check_identifier_syntax(response.as_str()) {
                 Ok(_) => break response,
                 Err(err) => {
                     println!(

@@ -15,12 +15,13 @@ pub fn avd_list(env: &Env) -> Result<BTreeSet<Emulator>, Error> {
         ["-list-avds"],
     )
     .vars(env.explicit_env())
+    .stderr_capture()
     .read()
     .map(|raw_list| {
         raw_list
             .split('\n')
             .filter_map(|name| {
-                if name.is_empty() {
+                if name.is_empty() || is_emulator_log_line(name) {
                     None
                 } else {
                     Some(Emulator::new(name.trim().into()))
@@ -29,4 +30,10 @@ pub fn avd_list(env: &Env) -> Result<BTreeSet<Emulator>, Error> {
             .collect::<BTreeSet<Emulator>>()
     })
     .map_err(Error::ListAvdsFailed)
+}
+
+fn is_emulator_log_line(name: &str) -> bool {
+    ["INFO    |", "WARNING |", "ERROR   |"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
 }

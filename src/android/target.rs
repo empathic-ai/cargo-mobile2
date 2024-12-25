@@ -212,10 +212,6 @@ impl<'a> Target<'a> {
         Ok(DotCargoTarget {
             linker: Some(linker),
             rustflags: vec![
-                "-L".to_owned(),
-                dunce::simplified(&config.app().prefix_path(".cargo"))
-                    .display()
-                    .to_string(),
                 "-Clink-arg=-landroid".to_owned(),
                 "-Clink-arg=-llog".to_owned(),
                 "-Clink-arg=-lOpenSLES".to_owned(),

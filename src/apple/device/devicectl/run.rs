@@ -3,6 +3,7 @@ use std::{env::temp_dir, fs::read_to_string};
 use crate::{
     apple::config::Config,
     env::{Env, ExplicitEnv as _},
+    opts::NoiseLevel,
     util::cli::{Report, Reportable},
     DuctExpressionExt,
 };
@@ -57,14 +58,14 @@ pub fn run(
     non_interactive: bool,
     id: &str,
     paired: bool,
+    noise_level: NoiseLevel,
 ) -> Result<duct::Handle, RunError> {
     if !paired {
         println!("Pairing with device...");
 
         duct::cmd("xcrun", ["devicectl", "manage", "pair", "--device", id])
             .vars(env.explicit_env())
-            .stdout_capture()
-            .stderr_capture()
+            .dup_stdio()
             .run()
             .map_err(RunError::DeployFailed)?;
     }
@@ -89,7 +90,8 @@ pub fn run(
             .arg("--json-output")
             .arg(&json_output_path_);
         Ok(())
-    });
+    })
+    .dup_stdio();
 
     cmd.run().map_err(RunError::DeployFailed)?;
 
@@ -115,7 +117,8 @@ pub fn run(
             &app_id,
         ],
     )
-    .vars(env.explicit_env());
+    .vars(env.explicit_env())
+    .dup_stdio();
 
     if non_interactive {
         launcher_cmd.start().map_err(RunError::DeployFailed)
@@ -126,8 +129,19 @@ pub fn run(
             .wait()
             .map_err(RunError::DeployFailed)?;
 
-        duct::cmd("idevicesyslog", ["--process", config.app().stylized_name()])
+        let app_name = config.app().stylized_name().to_string();
+
+        duct::cmd("idevicesyslog", ["--process", &app_name])
+            .before_spawn(move |cmd| {
+                if !noise_level.pedantic() {
+                    // when not in pedantic log mode, filter out logs that are not from the actual app
+                    // e.g. `App Name(UIKitCore)[processID]: message` vs `App Name[processID]: message`
+                    cmd.arg("--match").arg(format!("{app_name}["));
+                }
+                Ok(())
+            })
             .vars(env.explicit_env())
+            .dup_stdio()
             .start()
             .map_err(RunError::DeployFailed)
     }

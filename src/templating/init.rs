@@ -1,11 +1,12 @@
+use handlebars::RenderErrorReason;
+
 use crate::{
     bicycle::{
-        handlebars::{
-            self, Context, Handlebars, Helper, HelperResult, Output, RenderContext, RenderError,
-        },
+        handlebars::{self, Context, Handlebars, Helper, HelperResult, Output, RenderContext},
         Bicycle, EscapeFn, HelperDef, JsonMap,
     },
     config::{app, Config},
+    reserved_names::KOTLIN_ONLY_KEYWORDS,
     util::{self, Git},
 };
 use std::collections::HashMap;
@@ -45,7 +46,7 @@ fn join(
 ) -> HelperResult {
     out.write(
         &get_str_array(helper, |s| s.to_string())
-            .ok_or_else(|| RenderError::new("`join` helper wasn't given an array"))?
+            .ok_or_else(|| RenderErrorReason::Other("`join` helper wasn't given an array".into()))?
             .join(", "),
     )
     .map_err(Into::into)
@@ -60,7 +61,9 @@ fn quote_and_join(
 ) -> HelperResult {
     out.write(
         &get_str_array(helper, |s| format!("{:?}", s))
-            .ok_or_else(|| RenderError::new("`quote-and-join` helper wasn't given an array"))?
+            .ok_or_else(|| {
+                RenderErrorReason::Other("`quote-and-join` helper wasn't given an array".into())
+            })?
             .join(", "),
     )
     .map_err(Into::into)
@@ -76,7 +79,9 @@ fn quote_and_join_colon_prefix(
     out.write(
         &get_str_array(helper, |s| format!("{:?}", format!(":{}", s)))
             .ok_or_else(|| {
-                RenderError::new("`quote-and-join-colon-prefix` helper wasn't given an array")
+                RenderErrorReason::Other(
+                    "`quote-and-join-colon-prefix` helper wasn't given an array".into(),
+                )
             })?
             .join(", "),
     )
@@ -95,39 +100,63 @@ fn snake_case(
         .map_err(Into::into)
 }
 
-fn reverse_domain(
+fn ident_last_part(
     helper: &Helper,
     _: &Handlebars,
     _: &Context,
     _: &mut RenderContext,
     out: &mut dyn Output,
 ) -> HelperResult {
-    out.write(&util::reverse_domain(get_str(helper)))
-        .map_err(Into::into)
+    let last = get_str(helper).split('.').next_back().unwrap_or_default();
+    out.write(last).map_err(Into::into)
 }
 
-fn reverse_domain_snake_case(
+fn ident_no_last_part(
     helper: &Helper,
     _: &Handlebars,
     _: &Context,
     _: &mut RenderContext,
     out: &mut dyn Output,
 ) -> HelperResult {
-    use heck::ToSnekCase as _;
-    out.write(&util::reverse_domain(get_str(helper)).to_snek_case())
-        .map_err(Into::into)
+    let components = get_str(helper).split('.').collect::<Vec<_>>();
+    let ident_no_last = components[..components.len() - 1].join(".");
+    out.write(&ident_no_last).map_err(Into::into)
 }
 
-fn app_root(ctx: &Context) -> Result<&str, RenderError> {
+fn escape_kotlin_keyword(
+    helper: &Helper,
+    _: &Handlebars,
+    _: &Context,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let escaped_result = get_str(helper)
+        .split('.')
+        .map(|s| {
+            if KOTLIN_ONLY_KEYWORDS.contains(&s) {
+                format!("`{}`", s)
+            } else {
+                s.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(".");
+
+    out.write(&escaped_result).map_err(Into::into)
+}
+
+fn app_root(ctx: &Context) -> Result<&str, RenderErrorReason> {
     let app_root = ctx
         .data()
         .get(app::KEY)
-        .ok_or_else(|| RenderError::new("`app` missing from template data."))?
+        .ok_or_else(|| RenderErrorReason::Other("`app` missing from template data.".into()))?
         .get("root-dir")
-        .ok_or_else(|| RenderError::new("`app.root-dir` missing from template data."))?;
-    app_root
-        .as_str()
-        .ok_or_else(|| RenderError::new("`app.root-dir` contained invalid UTF-8."))
+        .ok_or_else(|| {
+            RenderErrorReason::Other("`app.root-dir` missing from template data.".into())
+        })?;
+    app_root.as_str().ok_or_else(|| {
+        RenderErrorReason::Other("`app.root-dir` contained invalid UTF-8..into()".into())
+    })
 }
 
 fn prefix_path(
@@ -141,8 +170,9 @@ fn prefix_path(
         util::prefix_path(app_root(ctx)?, get_str(helper))
             .to_str()
             .ok_or_else(|| {
-                RenderError::new(
-                    "Either the `app.root-dir` or the specified path contained invalid UTF-8.",
+                RenderErrorReason::Other(
+                    "Either the `app.root-dir` or the specified path contained invalid UTF-8."
+                        .into(),
                 )
             })?,
     )
@@ -159,12 +189,15 @@ fn unprefix_path(
     out.write(
         util::unprefix_path(app_root(ctx)?, get_str(helper))
             .map_err(|_| {
-                RenderError::new("Attempted to unprefix a path that wasn't in the app root dir.")
+                RenderErrorReason::Other(
+                    "Attempted to unprefix a path that wasn't in the app root dir.".into(),
+                )
             })?
             .to_str()
             .ok_or_else(|| {
-                RenderError::new(
-                    "Either the `app.root-dir` or the specified path contained invalid UTF-8.",
+                RenderErrorReason::Other(
+                    "Either the `app.root-dir` or the specified path contained invalid UTF-8."
+                        .into(),
                 )
             })?,
     )
@@ -204,11 +237,9 @@ pub fn init(config: Option<&Config>) -> Bicycle {
                 Box::new(quote_and_join_colon_prefix),
             );
             helpers.insert("snake-case", Box::new(snake_case));
-            helpers.insert("reverse-domain", Box::new(reverse_domain));
-            helpers.insert(
-                "reverse-domain-snake-case",
-                Box::new(reverse_domain_snake_case),
-            );
+            helpers.insert("ident-no-last-part", Box::new(ident_no_last_part));
+            helpers.insert("ident-last-part", Box::new(ident_last_part));
+            helpers.insert("escape-kotlin-keyword", Box::new(escape_kotlin_keyword));
             helpers.insert("dot-to-slash", Box::new(dot_to_slash));
             if config.is_some() {
                 // don't mix these up or very bad things will happen to all of us

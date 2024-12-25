@@ -2,6 +2,7 @@ use super::{
     config::{Config, Metadata},
     system_profile::{self, DeveloperTools},
     version_number::VersionNumber,
+    AuthCredentials,
 };
 use crate::{
     env::{Env, ExplicitEnv as _},
@@ -18,6 +19,7 @@ use once_cell_regex::exports::once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap},
     ffi::{OsStr, OsString},
+    process::Command,
 };
 use thiserror::Error;
 
@@ -130,6 +132,116 @@ pub struct ExportError(#[from] std::io::Error);
 impl Reportable for ExportError {
     fn report(&self) -> Report {
         Report::error("Failed to export archive via `xcodebuild`", &self.0)
+    }
+}
+
+#[derive(Default)]
+pub struct XcodebuildOptions {
+    allow_provisioning_updates: bool,
+    skip_codesign: bool,
+    authentication_credentials: Option<AuthCredentials>,
+}
+
+impl XcodebuildOptions {
+    fn args_for(&self, cmd: &mut Command) {
+        if self.skip_codesign {
+            cmd.args([
+                "CODE_SIGNING_REQUIRED=NO",
+                "CODE_SIGNING_ALLOWED=NO",
+                "CODE_SIGN_IDENTITY=\"\"",
+                "CODE_SIGN_ENTITLEMENTS=\"\"",
+            ]);
+        }
+
+        if self.allow_provisioning_updates {
+            cmd.arg("-allowProvisioningUpdates");
+        }
+
+        if let Some(credentials) = &self.authentication_credentials {
+            cmd.args(["-authenticationKeyID", &credentials.key_id])
+                .arg("-authenticationKeyPath")
+                .arg(&credentials.key_path)
+                .args(["-authenticationKeyIssuerID", &credentials.key_issuer_id]);
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct ExportConfig {
+    xcodebuild_options: XcodebuildOptions,
+}
+
+impl ExportConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn allow_provisioning_updates(mut self) -> Self {
+        self.xcodebuild_options.allow_provisioning_updates = true;
+        self
+    }
+
+    pub fn authentication_credentials(mut self, credentials: AuthCredentials) -> Self {
+        self.xcodebuild_options
+            .authentication_credentials
+            .replace(credentials);
+        self
+    }
+}
+
+#[derive(Default)]
+pub struct BuildConfig {
+    xcodebuild_options: XcodebuildOptions,
+}
+
+impl BuildConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn allow_provisioning_updates(mut self) -> Self {
+        self.xcodebuild_options.allow_provisioning_updates = true;
+        self
+    }
+
+    pub fn skip_codesign(mut self) -> Self {
+        self.xcodebuild_options.skip_codesign = true;
+        self
+    }
+
+    pub fn authentication_credentials(mut self, credentials: AuthCredentials) -> Self {
+        self.xcodebuild_options
+            .authentication_credentials
+            .replace(credentials);
+        self
+    }
+}
+
+#[derive(Default)]
+pub struct ArchiveConfig {
+    xcodebuild_options: XcodebuildOptions,
+}
+
+impl ArchiveConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn allow_provisioning_updates(mut self) -> Self {
+        self.xcodebuild_options.allow_provisioning_updates = true;
+        self
+    }
+
+    pub fn skip_codesign(mut self) -> Self {
+        self.xcodebuild_options.skip_codesign = true;
+        self
+    }
+
+    pub fn authentication_credentials(mut self, credentials: AuthCredentials) -> Self {
+        self.xcodebuild_options
+            .authentication_credentials
+            .replace(credentials);
+        self
     }
 }
 
@@ -314,32 +426,39 @@ impl<'a> Target<'a> {
         &self,
         config: &Config,
         env: &Env,
-        noise_level: opts::NoiseLevel,
+        _noise_level: opts::NoiseLevel,
         profile: opts::Profile,
+        build_config: BuildConfig,
     ) -> Result<(), BuildError> {
         let configuration = profile.as_str();
         let scheme = config.scheme();
         let workspace_path = config.workspace_path();
         let sdk = self.sdk.to_string();
-        let arch = self.arch.to_string();
+        let arch = if self.is_macos() {
+            Some(self.arch.to_string())
+        } else {
+            None
+        };
         let args: Vec<OsString> = vec![];
         duct::cmd("xcodebuild", args)
             .full_env(env.explicit_env())
             .env("FORCE_COLOR", "--force-color")
             .before_spawn(move |cmd| {
-                if let Some(v) = verbosity(noise_level) {
-                    cmd.arg(v);
+                build_config.xcodebuild_options.args_for(cmd);
+
+                if let Some(a) = &arch {
+                    cmd.args(["-arch", a]);
                 }
+
                 cmd.args(["-scheme", &scheme])
                     .arg("-workspace")
                     .arg(&workspace_path)
                     .args(["-sdk", &sdk])
                     .args(["-configuration", configuration])
-                    .args(["-arch", &arch])
-                    .arg("-allowProvisioningUpdates")
                     .arg("build");
                 Ok(())
             })
+            .dup_stdio()
             .start()?
             .wait()?;
         Ok(())
@@ -352,6 +471,7 @@ impl<'a> Target<'a> {
         noise_level: opts::NoiseLevel,
         profile: opts::Profile,
         build_number: Option<VersionNumber>,
+        archive_config: ArchiveConfig,
     ) -> Result<(), ArchiveError> {
         if let Some(build_number) = build_number {
             util::with_working_dir(config.project_dir(), || {
@@ -359,6 +479,7 @@ impl<'a> Target<'a> {
                     "xcrun",
                     ["agvtool", "new-version", "-all", &build_number.to_string()],
                 )
+                .dup_stdio()
                 .run()
             })
             .map_err(ArchiveError::SetVersionFailed)?;
@@ -369,26 +490,35 @@ impl<'a> Target<'a> {
         let scheme = config.scheme();
         let workspace_path = config.workspace_path();
         let sdk = self.sdk.to_string();
-        let arch = self.arch.to_string();
+        let arch = if self.is_macos() {
+            Some(self.arch.to_string())
+        } else {
+            None
+        };
         let args: Vec<OsString> = vec![];
         duct::cmd("xcodebuild", args)
             .full_env(env.explicit_env())
             .before_spawn(move |cmd| {
+                archive_config.xcodebuild_options.args_for(cmd);
+
                 if let Some(v) = verbosity(noise_level) {
                     cmd.arg(v);
+                }
+                if let Some(a) = &arch {
+                    cmd.args(["-arch", a]);
                 }
                 cmd.args(["-scheme", &scheme])
                     .arg("-workspace")
                     .arg(&workspace_path)
                     .args(["-sdk", &sdk])
                     .args(["-configuration", configuration])
-                    .args(["-arch", &arch])
                     .arg("-allowProvisioningUpdates")
                     .arg("archive")
                     .arg("-archivePath")
                     .arg(&archive_path);
                 Ok(())
             })
+            .dup_stdio()
             .start()?
             .wait()?;
 
@@ -400,6 +530,7 @@ impl<'a> Target<'a> {
         config: &Config,
         env: &Env,
         noise_level: opts::NoiseLevel,
+        export_config: ExportConfig,
     ) -> Result<(), ExportError> {
         // Super fun discrepancy in expectation of `-archivePath` value
         let archive_path = config
@@ -412,6 +543,8 @@ impl<'a> Target<'a> {
         duct::cmd("xcodebuild", args)
             .full_env(env.explicit_env())
             .before_spawn(move |cmd| {
+                export_config.xcodebuild_options.args_for(cmd);
+
                 if let Some(v) = verbosity(noise_level) {
                     cmd.arg(v);
                 }
@@ -422,8 +555,10 @@ impl<'a> Target<'a> {
                     .arg(&export_plist_path)
                     .arg("-exportPath")
                     .arg(&export_dir);
+
                 Ok(())
             })
+            .dup_stdio()
             .start()?
             .wait()?;
 

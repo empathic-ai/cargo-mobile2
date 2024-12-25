@@ -3,7 +3,10 @@ use crate::{
         config::{Config, Metadata},
         device::{self, Device, RunError},
         rust_version_check,
-        target::{ArchiveError, BuildError, CheckError, CompileLibError, ExportError, Target},
+        target::{
+            ArchiveConfig, ArchiveError, BuildConfig, BuildError, CheckError, CompileLibError,
+            ExportError, Target,
+        },
         NAME,
     },
     config::{
@@ -314,7 +317,13 @@ impl Exec for Input {
                     &env,
                     |target: &Target| {
                         target
-                            .build(config, &env, noise_level, profile)
+                            .build(
+                                config,
+                                &env,
+                                noise_level,
+                                profile,
+                                BuildConfig::default().allow_provisioning_updates(),
+                            )
                             .map_err(Error::BuildFailed)
                     },
                 )
@@ -338,10 +347,23 @@ impl Exec for Input {
                         }
 
                         target
-                            .build(config, &env, noise_level, profile)
+                            .build(
+                                config,
+                                &env,
+                                noise_level,
+                                profile,
+                                BuildConfig::new().allow_provisioning_updates(),
+                            )
                             .map_err(Error::BuildFailed)?;
                         target
-                            .archive(config, &env, noise_level, profile, Some(app_version))
+                            .archive(
+                                config,
+                                &env,
+                                noise_level,
+                                profile,
+                                Some(app_version),
+                                ArchiveConfig::new().allow_provisioning_updates(),
+                            )
                             .map_err(Error::ArchiveFailed)
                     },
                 )
@@ -464,11 +486,11 @@ impl Exec for Input {
                     target_env.insert(cflags.as_ref(), isysroot.as_ref());
                     target_env.insert(cxxflags.as_ref(), isysroot.as_ref());
                     target_env.insert(objc_include_path.as_ref(), include_dir.as_ref());
-                    // Prevents linker errors in build scripts and proc macros:
-                    // https://github.com/signalapp/libsignal-client/commit/02899cac643a14b2ced7c058cc15a836a2165b6d
-                    target_env.insert("LIBRARY_PATH", library_path.as_ref());
 
                     let target = if macos {
+                        // Prevents linker errors in build scripts and proc macros:
+                        // https://github.com/signalapp/libsignal-client/commit/02899cac643a14b2ced7c058cc15a836a2165b6d
+                        target_env.insert("LIBRARY_PATH", library_path.as_ref());
                         &macos_target
                     } else {
                         Target::for_arch(&arch).ok_or_else(|| Error::ArchInvalid {
