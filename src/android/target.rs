@@ -18,7 +18,7 @@ use serde::Serialize;
 use std::{collections::BTreeMap, fmt, io, path::PathBuf, str};
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CargoMode {
     Check,
     Build,
@@ -28,7 +28,7 @@ impl fmt::Display for CargoMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CargoMode::Check => write!(f, "check"),
-            CargoMode::Build => write!(f, "build"),
+            CargoMode::Build => write!(f, "rustc"),
         }
     }
 }
@@ -37,7 +37,7 @@ impl CargoMode {
     pub fn as_str(&self) -> &'static str {
         match self {
             CargoMode::Check => "check",
-            CargoMode::Build => "build",
+            CargoMode::Build => "rustc",
         }
     }
 }
@@ -235,7 +235,7 @@ impl<'a> Target<'a> {
         // Force color, since gradle would otherwise give us uncolored output
         // (which Android Studio makes red, which is extra gross!)
         let color = if force_color { "always" } else { "auto" };
-        CargoCommand::new(mode.as_str())
+        let mut command = CargoCommand::new(mode.as_str())
             .with_verbose(noise_level.pedantic())
             .with_package(Some(config.app().name()))
             .with_manifest_path(Some(config.app().manifest_path()))
@@ -243,8 +243,14 @@ impl<'a> Target<'a> {
             .with_no_default_features(metadata.no_default_features())
             .with_args(metadata.cargo_args())
             .with_features(metadata.features())
-            .with_release(profile.release())
-            .build(env)
+            .with_release(profile.release());
+
+        let args = ["--crate-type=staticlib,cdylib,rlib".to_string()];   
+        if mode == CargoMode::Build {
+             command = command.with_rustc_args(Some(&args));
+        }
+
+        command.build(env)
             .env("ANDROID_NATIVE_API_LEVEL", min_sdk_version.to_string())
             .env(
                 "TARGET_AR",

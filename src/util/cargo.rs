@@ -12,6 +12,7 @@ pub struct CargoCommand<'a> {
     no_default_features: bool,
     features: Option<&'a [String]>,
     args: Option<&'a [String]>,
+    rustc_args: Option<&'a [String]>,
     release: bool,
 }
 
@@ -26,6 +27,7 @@ impl<'a> CargoCommand<'a> {
             no_default_features: Default::default(),
             features: Default::default(),
             args: Default::default(),
+            rustc_args: Default::default(),
             release: Default::default(),
         }
     }
@@ -71,12 +73,19 @@ impl<'a> CargoCommand<'a> {
         self.release = release;
         self
     }
+    
+    pub fn with_rustc_args(mut self, rustc_args: Option<&'a [String]>) -> Self {
+        self.rustc_args = rustc_args;
+        self
+    }
 
     pub fn build(self, env: &impl ExplicitEnv) -> duct::Expression {
         let mut args = vec![self.subcommand.to_owned()];
+
         if self.verbose {
             args.push("-vv".into());
         }
+
         if let Some(package) = self.package {
             args.extend_from_slice(&["--package".into(), package.to_owned()]);
         }
@@ -112,6 +121,10 @@ impl<'a> CargoCommand<'a> {
         }
         if self.release {
             args.push("--release".into());
+        }
+        if let Some(a) = self.rustc_args {
+            args.push("--".into());
+            args.extend_from_slice(a);
         }
 
         duct::cmd("cargo", args)
