@@ -12,6 +12,7 @@ pub struct CargoCommand<'a> {
     no_default_features: bool,
     features: Option<&'a [String]>,
     args: Option<&'a [String]>,
+    color: Option<&'a str>,
     rustc_args: Option<&'a [String]>,
     release: bool,
 }
@@ -27,6 +28,7 @@ impl<'a> CargoCommand<'a> {
             no_default_features: Default::default(),
             features: Default::default(),
             args: Default::default(),
+            color: Default::default(),
             rustc_args: Default::default(),
             release: Default::default(),
         }
@@ -71,6 +73,11 @@ impl<'a> CargoCommand<'a> {
 
     pub fn with_release(mut self, release: bool) -> Self {
         self.release = release;
+        self
+    }
+
+    pub fn color(mut self, color: Option<&'a str>) -> Self {
+        self.color = color;
         self
     }
     

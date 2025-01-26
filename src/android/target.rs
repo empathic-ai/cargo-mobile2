@@ -243,7 +243,8 @@ impl<'a> Target<'a> {
             .with_no_default_features(metadata.no_default_features())
             .with_args(metadata.cargo_args())
             .with_features(metadata.features())
-            .with_release(profile.release());
+            .with_release(profile.release())
+            .color(Some(color));
 
         let args = ["--crate-type=staticlib,cdylib,rlib".to_string()];   
         if mode == CargoMode::Build {
@@ -270,10 +271,6 @@ impl<'a> Target<'a> {
                     .compiler_path(ndk::Compiler::Clangxx, self.clang_triple(), min_sdk_version)
                     .map_err(CompileLibError::MissingTool)?,
             )
-            .before_spawn(move |cmd| {
-                cmd.args(["--color", color]);
-                Ok(())
-            })
             .run()
             .map_err(|cause| CompileLibError::CargoFailed { mode, cause })?;
         Ok(())
