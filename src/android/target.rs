@@ -246,7 +246,7 @@ impl<'a> Target<'a> {
             .with_release(profile.release())
             .color(Some(color));
 
-        let args = ["--crate-type=staticlib,cdylib,rlib".to_string()];   
+        let args = ["--crate-type=staticlib,cdylib,lib".to_string()];   
         if mode == CargoMode::Build {
              command = command.with_rustc_args(Some(&args));
         }
