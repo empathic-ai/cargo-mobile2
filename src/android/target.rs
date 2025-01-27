@@ -11,7 +11,7 @@ use crate::{
     util::{
         cli::{Report, Reportable},
         CargoCommand,
-    },
+    }
 };
 use once_cell_regex::exports::once_cell::sync::OnceCell;
 use serde::Serialize;
@@ -251,6 +251,12 @@ impl<'a> Target<'a> {
              command = command.with_rustc_args(Some(&args));
         }
 
+        let dir = std::env::current_dir().unwrap();
+
+        duct::cmd("cd", vec!["./../../"])
+            .run()
+            .map_err(|cause| CompileLibError::CargoFailed { mode, cause })?;
+
         command.build(env)
             .env("ANDROID_NATIVE_API_LEVEL", min_sdk_version.to_string())
             .env(
@@ -273,6 +279,11 @@ impl<'a> Target<'a> {
             )
             .run()
             .map_err(|cause| CompileLibError::CargoFailed { mode, cause })?;
+
+        duct::cmd("cd", vec![dir.to_str().unwrap()])
+            .run()
+            .map_err(|cause| CompileLibError::CargoFailed { mode, cause })?;
+
         Ok(())
     }
 
