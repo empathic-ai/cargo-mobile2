@@ -238,7 +238,7 @@ impl<'a> Target<'a> {
         let mut command = CargoCommand::new(mode.as_str())
             .with_verbose(noise_level.pedantic())
             .with_package(Some(config.app().name()))
-            //.with_manifest_path(Some(config.app().manifest_path()))
+            .with_manifest_path(Some(config.app().manifest_path()))
             .with_target(Some(self.triple))
             .with_no_default_features(metadata.no_default_features())
             .with_args(metadata.cargo_args())
